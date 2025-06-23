@@ -1,4 +1,4 @@
-# 📊 Calculadora EPH – INDEC
+# 📊 Calculadora EPH – INDEC - UCCuyo
 
 Esta calculadora interactiva permite cargar bases de datos del **4º trimestre de la Encuesta Permanente de Hogares (EPH)** del INDEC, junto con el instructivo de variables correspondiente, y obtener automáticamente un **análisis cuantitativo general**.
 
