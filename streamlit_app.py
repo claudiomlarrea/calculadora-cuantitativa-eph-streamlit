@@ -45,25 +45,12 @@ def extraer_diccionario_desde_pdf(pdf_file):
 def generar_informe_word(anio):
     doc = Document()
     doc.add_heading(f"Informe Interpretativo EPH – Anual {anio}", level=1)
-
     doc.add_heading("🏠 Base de Hogares – Interpretación", level=2)
-    doc.add_paragraph("""- Cantidad de hogares analizados: 19.035 hogares únicos.
-- Código de región: predominancia Pampeana y Cuyo.
-- Tipo de vivienda: mayoría en casas.
-- Acceso al agua: casi todos los hogares tienen agua dentro de la vivienda.
-- Fuente de agua: mayoría con acceso a red pública.""")
-
+    doc.add_paragraph("El análisis incluye distribución regional, condiciones habitacionales, acceso a servicios básicos y tipología de vivienda.")
     doc.add_heading("👤 Base de Individuos – Interpretación", level=2)
-    doc.add_paragraph("""- Total de personas: 58.519
-- Sexo: distribución equilibrada, leve mayoría femenina.
-- Nivel educativo: predominancia en secundaria.
-- Condición de actividad: alta proporción de inactivos o dependientes.
-- Trabajo informal: baja formalidad y escasa asociación.""")
-
+    doc.add_paragraph("Se analiza la distribución por sexo, edad, nivel educativo, condición de actividad e ingresos.")
     doc.add_heading("📌 Conclusión General", level=2)
-    doc.add_paragraph("""La mayoría de las personas viven en condiciones adecuadas. Se observa una estructura social
-con dependencia, inactividad y bajo nivel de formalización en el trabajo autónomo.""")
-
+    doc.add_paragraph("Este informe permite identificar patrones sociales y económicos de la población urbana argentina para el año seleccionado.")
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -71,38 +58,46 @@ con dependencia, inactividad y bajo nivel de formalización en el trabajo autón
 
 if hogares_file and individuos_file and instructivo_pdf:
     mapa = extraer_diccionario_desde_pdf(instructivo_pdf)
+    df_hogar = pd.read_excel(hogares_file)
+    df_ind = pd.read_excel(individuos_file)
+
     if mapa:
-        df_hogar = pd.read_excel(hogares_file).rename(columns=mapa)
-        df_ind = pd.read_excel(individuos_file).rename(columns=mapa)
+        df_hogar = df_hogar.rename(columns=mapa)
+        df_ind = df_ind.rename(columns=mapa)
 
-        if "Código de Vivienda" in df_hogar.columns and "Número de Hogar" in df_hogar.columns:
-            df_hogar = df_hogar.drop_duplicates(subset=["Código de Vivienda", "Número de Hogar"])
-        if all(x in df_ind.columns for x in ["Código de Vivienda", "Número de Hogar", "Número de Componente"]):
-            df_ind = df_ind.drop_duplicates(subset=["Código de Vivienda", "Número de Hogar", "Número de Componente"])
+    if "CODUSU" in df_hogar.columns and "NRO_HOGAR" in df_hogar.columns:
+        df_hogar = df_hogar.drop_duplicates(subset=["CODUSU", "NRO_HOGAR"])
+    if all(x in df_ind.columns for x in ["CODUSU", "NRO_HOGAR", "COMPONENTE"]):
+        df_ind = df_ind.drop_duplicates(subset=["CODUSU", "NRO_HOGAR", "COMPONENTE"])
 
-        cols_hogar = [c for c in df_hogar.columns if any(x in c.lower() for x in ["ingreso", "región", "agua", "baño", "vivienda", "ipcf", "itf"])]
-        cols_ind = [c for c in df_ind.columns if any(x in c.lower() for x in ["edad", "sexo", "educ", "actividad", "ingreso"])]
+    # Usar columnas nominales o crudas
+    posibles_hogar = ["ingreso", "región", "agua", "baño", "vivienda", "ipcf", "itf", "PONDIH"]
+    posibles_ind = ["sexo", "edad", "educ", "actividad", "ingreso", "ESTADO", "CH04", "CH05", "NIVEL_ED", "ITF", "IPCF"]
 
-        if not cols_hogar:
-            st.error("No se encontraron variables relevantes en la base de hogares después del renombrado. Verificá el instructivo PDF.")
-            st.stop()
-        if not cols_ind:
-            st.error("No se encontraron variables relevantes en la base de individuos después del renombrado. Verificá el instructivo PDF.")
-            st.stop()
+    cols_hogar = [c for c in df_hogar.columns if any(x in c.lower() for x in posibles_hogar)]
+    cols_ind = [c for c in df_ind.columns if any(x in c.lower() for x in posibles_ind)]
 
-        resumen_hogar = df_hogar[cols_hogar].describe(include="all").transpose()
-        resumen_ind = df_ind[cols_ind].describe(include="all").transpose()
+    if not cols_hogar:
+        st.warning("No se encontraron columnas clave en la base de hogares. Se usarán columnas originales si son útiles.")
+        cols_hogar = df_hogar.columns[:10].tolist()
 
-        output_excel = io.BytesIO()
-        with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
-            resumen_hogar.to_excel(writer, sheet_name="Resumen Hogares")
-            resumen_ind.to_excel(writer, sheet_name="Resumen Individuos")
-        output_excel.seek(0)
+    if not cols_ind:
+        st.warning("No se encontraron columnas clave en la base de individuos. Se usarán columnas originales si son útiles.")
+        cols_ind = df_ind.columns[:10].tolist()
 
-        output_word = generar_informe_word(anio)
+    resumen_hogar = df_hogar[cols_hogar].describe(include="all").transpose()
+    resumen_ind = df_ind[cols_ind].describe(include="all").transpose()
 
-        st.success("✅ Análisis completo generado.")
-        st.download_button("📥 Descargar Excel", data=output_excel, file_name="informe_eph.xlsx")
-        st.download_button("📥 Descargar Informe Interpretativo (Word)", data=output_word, file_name=f"informe_eph_{anio}.docx")
+    output_excel = io.BytesIO()
+    with pd.ExcelWriter(output_excel, engine="openpyxl") as writer:
+        resumen_hogar.to_excel(writer, sheet_name="Resumen Hogares")
+        resumen_ind.to_excel(writer, sheet_name="Resumen Individuos")
+    output_excel.seek(0)
+
+    output_word = generar_informe_word(anio)
+
+    st.success("✅ Análisis generado.")
+    st.download_button("📥 Descargar Excel", data=output_excel, file_name=f"informe_eph_{anio}.xlsx")
+    st.download_button("📥 Descargar Informe Interpretativo (Word)", data=output_word, file_name=f"informe_eph_{anio}.docx")
 else:
     st.info("📥 Subí las bases de hogares, individuos y el instructivo PDF para comenzar.")
