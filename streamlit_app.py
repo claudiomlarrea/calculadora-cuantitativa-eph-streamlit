@@ -16,20 +16,6 @@ instructivo_pdf = st.file_uploader("📄 Instructivo PDF", type="pdf")
 
 def limpiar_descripcion_variable(desc):
     desc = desc.replace(".....", "").replace("....", "").replace("...", "").strip()
-    correcciones = {
-        "Tiene agua": "Acceso al agua",
-        "El agua es de": "Fuente de agua",
-        "¿tiene baño/letrina?": "Tiene baño o letrina",
-        "El baño o letrina está": "Ubicación del baño o letrina",
-        "El baño tiene": "Tipo de baño",
-        "El desague del baño es": "Desagüe del baño",
-        "La vivienda está ubicada cerca de basural/es(3": "Proximidad a basural",
-        "La vivienda está ubicada en zona inundable": "Zona inundable",
-        "La vivienda está ubicada en villa de emergencia": "Vivienda en villa de emergencia"
-    }
-    for parcial, reemplazo in correcciones.items():
-        if parcial.lower() in desc.lower():
-            return reemplazo
     return desc.strip().capitalize()
 
 def extraer_diccionario_desde_pdf(pdf_file):
@@ -71,19 +57,7 @@ def generar_informe_word(anio):
         "Los resultados muestran cómo se distribuyen los recursos, el acceso a servicios esenciales, el perfil educativo y la inserción laboral de la población urbana argentina. "
         "Este tipo de análisis es fundamental para identificar desigualdades estructurales, orientar intervenciones estatales y promover el desarrollo con equidad."
     )
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
 
-    doc = Document()
-    doc.add_heading(f"Informe Interpretativo EPH – Anual {anio}", level=1)
-    doc.add_heading("🏠 Base de Hogares – Interpretación", level=2)
-    doc.add_paragraph("El análisis incluye distribución regional, condiciones habitacionales, acceso a servicios básicos y tipología de vivienda.")
-    doc.add_heading("👤 Base de Individuos – Interpretación", level=2)
-    doc.add_paragraph("Se analiza la distribución por sexo, edad, nivel educativo, condición de actividad e ingresos.")
-    doc.add_heading("📌 Conclusión General", level=2)
-    doc.add_paragraph("Este informe permite identificar patrones sociales y económicos de la población urbana argentina para el año seleccionado.")
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -98,25 +72,11 @@ if hogares_file and individuos_file and instructivo_pdf:
         df_hogar = df_hogar.rename(columns=mapa)
         df_ind = df_ind.rename(columns=mapa)
 
-    if "CODUSU" in df_hogar.columns and "NRO_HOGAR" in df_hogar.columns:
-        df_hogar = df_hogar.drop_duplicates(subset=["CODUSU", "NRO_HOGAR"])
-    if all(x in df_ind.columns for x in ["CODUSU", "NRO_HOGAR", "COMPONENTE"]):
-        df_ind = df_ind.drop_duplicates(subset=["CODUSU", "NRO_HOGAR", "COMPONENTE"])
-
-    # Usar columnas nominales o crudas
-    posibles_hogar = ["ingreso", "región", "agua", "baño", "vivienda", "ipcf", "itf", "PONDIH"]
-    posibles_ind = ["sexo", "edad", "educ", "actividad", "ingreso", "ESTADO", "CH04", "CH05", "NIVEL_ED", "ITF", "IPCF"]
+    posibles_hogar = ["ingreso", "región", "agua", "baño", "vivienda", "ipcf", "itf"]
+    posibles_ind = ["sexo", "edad", "educ", "actividad", "ingreso", "estado", "ch04", "nivel_ed"]
 
     cols_hogar = [c for c in df_hogar.columns if any(x in c.lower() for x in posibles_hogar)]
     cols_ind = [c for c in df_ind.columns if any(x in c.lower() for x in posibles_ind)]
-
-    if not cols_hogar:
-        st.warning("No se encontraron columnas clave en la base de hogares. Se usarán columnas originales si son útiles.")
-        cols_hogar = df_hogar.columns[:10].tolist()
-
-    if not cols_ind:
-        st.warning("No se encontraron columnas clave en la base de individuos. Se usarán columnas originales si son útiles.")
-        cols_ind = df_ind.columns[:10].tolist()
 
     resumen_hogar = df_hogar[cols_hogar].describe(include="all").transpose()
     resumen_ind = df_ind[cols_ind].describe(include="all").transpose()
